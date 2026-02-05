@@ -1,0 +1,1 @@
+import "./lexdoka-app.js";
