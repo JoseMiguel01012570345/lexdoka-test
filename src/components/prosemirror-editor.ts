@@ -7,6 +7,8 @@ import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap } from "prosemirror-commands";
 import type { VariableCapsule } from "../types/variables.js";
+import { ContextConsumer, ContextProvider } from "@lit/context";
+import { lexdokaContext } from "../context/context.js";
 
 /**
  * Editor ProseMirror con dos modos:
@@ -80,6 +82,15 @@ export class ProseMirrorEditor extends LitElement {
   @property({ type: Object }) initialDoc: unknown = null;
   @property({ type: Array }) availableCapsules: VariableCapsule[] = [];
   @state() private _view: EditorView | null = null;
+  @property()
+  private lexDokaConsumer = new ContextConsumer(this, {
+    context: lexdokaContext,
+    subscribe: true,
+  });
+  private lexDokaProvider = new ContextProvider(this, {
+    context: lexdokaContext,
+  });
+
   /** Doc a usar en la próxima creación del editor (tras cambio de modo) */
   private _nextDoc: unknown = null;
 
@@ -122,7 +133,6 @@ export class ProseMirrorEditor extends LitElement {
       new Plugin({
         props: {
           handleClick(_view, _pos, event) {
-            console.log("Click");
             if (component.productionMode) return false;
             const target = (event.target as HTMLElement).closest(
               ".variable-capsule",
@@ -192,7 +202,6 @@ export class ProseMirrorEditor extends LitElement {
         view: EditorView,
         getPos: () => number | undefined,
       ) {
-        console.log({ node });
         const span = document.createElement("span");
         span.className = "variable-capsule production-input";
         span.setAttribute("data-capsule-id", node.attrs.id);
@@ -206,13 +215,12 @@ export class ProseMirrorEditor extends LitElement {
           textarea.addEventListener("input", () => {
             const pos = getPos();
             if (pos == null) return;
-            console.log({ pos });
             const tr = view.state.tr.setNodeMarkup(pos, undefined, {
               ...node.attrs,
               value: textarea.value,
             });
             // TODO: When the transition occurs, the component unselects
-            view.dispatch(tr);
+            // view.dispatch(tr);
           });
           span.appendChild(textarea);
         } else {
@@ -235,8 +243,36 @@ export class ProseMirrorEditor extends LitElement {
         return { dom: span };
       },
     };
-    console.log({ ret });
     return ret;
+  }
+
+  editCapsule(label: string, helpText: string, type: string) {
+    const nodes = this._view!.state.doc.content.content[0].content.content;
+    let index = 0;
+    nodes.forEach((node) => {
+      if (
+        node &&
+        node.type.name === "variableCapsule" &&
+        node.attrs.type === type
+      ) {
+        const updatedNode = node.type.create(
+          {
+            ...node.attrs,
+            label,
+            helpText,
+            type,
+          },
+          node.content,
+          node.marks,
+        );
+        const { state, dispatch } = this._view!;
+        const tr = state.tr.replaceWith(index + 1, index + 2, updatedNode);
+        dispatch(tr);
+      }
+      if (node.type.name !== "variableCapsule") {
+        index += node.text!.length;
+      } else index += 1;
+    });
   }
 
   updated(changed: Map<string, unknown>) {
@@ -253,6 +289,19 @@ export class ProseMirrorEditor extends LitElement {
       !changed.has("productionMode")
     ) {
       this.setDocFromJSON(this.initialDoc);
+    }
+    console.log({ lexDokaConsumer: this.lexDokaConsumer.value });
+
+    if (this.lexDokaConsumer.value.saveCapsule) {
+      let label = this.lexDokaConsumer.value._offcanvasCapsule!.label;
+      let helpText = this.lexDokaConsumer.value._offcanvasCapsule!.helpText;
+      let type = this.lexDokaConsumer.value._offcanvasCapsule!.type;
+      this.editCapsule(label, helpText, type);
+      this.dispatchEvent(new CustomEvent("modified-capsule"));
+      this.lexDokaProvider.setValue({
+        saveCapsule: false,
+        _offcanvasCapsule: null,
+      });
     }
   }
 
@@ -291,9 +340,12 @@ export class ProseMirrorEditor extends LitElement {
               </div>
             `
           : nothing}
-        <hr
-          style="margin: 0 0.5em 0.5em; border: none; border-top: 2px solid #ddd; height: 1px;"
-        />
+        ${!this.productionMode
+          ? html`<hr
+              style="margin: 0 0.5em 0.5em; border: none; border-top: 2px solid #ddd; height: 1px;"
+            />`
+          : ""}
+
         <div class="pm-content"></div>
       </div>
     `;
@@ -310,9 +362,8 @@ export class ProseMirrorEditor extends LitElement {
     });
     const { state, dispatch } = this._view;
     const { from } = state.selection;
-    console.log({ from, state });
     const tr = state.tr.insert(from, node);
-    tr.setSelection(TextSelection.near(tr.doc.resolve(from + node.nodeSize)));
+    // tr.setSelection(TextSelection.near(tr.doc.resolve(from + node.nodeSize)));
     dispatch(tr);
   }
 }

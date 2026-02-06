@@ -5,6 +5,8 @@ import "./components/canvas-form.js";
 import "./components/capsule-config-offcanvas.js";
 import type { VariableCapsule, CanvasCapsule } from "./types/variables.js";
 import { loadFromStorage, saveToStorage } from "./lib/storage.js";
+import { ContextProvider } from "@lit/context";
+import { lexdokaContext } from "./context/context.js";
 
 /**
  * Aplicación principal LexDoka.
@@ -58,6 +60,14 @@ export class LexDokaApp extends LitElement {
   @state() private _canvasCapsules: CanvasCapsule[] = [];
   @state() private _offcanvasCapsule: VariableCapsule | null = null;
   @state() private _offcanvasOpen = false;
+  private _provider = new ContextProvider(this, {
+    context: lexdokaContext,
+    initialValue: {
+      saveCapsule: false,
+      _offcanvasCapsule: this._offcanvasCapsule,
+    },
+  });
+  // @state() private saveCapsule = false;
 
   /** Cápsulas disponibles (para ProseMirror: las del Canvas se usan como "variables" insertables) */
   get availableCapsules(): VariableCapsule[] {
@@ -78,10 +88,12 @@ export class LexDokaApp extends LitElement {
   }
 
   private _saveToStorage() {
+    console.log("saving");
     const editor = this.querySelector("prosemirror-editor") as {
       getDocJSON?: () => unknown;
     } | null;
     const proseDoc = editor?.getDocJSON?.() ?? this._proseDoc;
+    console.log({ editor });
     // TODO: empty doc is not being saved
     if (proseDoc) this._proseDoc = proseDoc;
     saveToStorage({
@@ -123,35 +135,26 @@ export class LexDokaApp extends LitElement {
         ? { ...c, label, helpText, type: type as CanvasCapsule["type"] }
         : c,
     );
-    this._offcanvasCapsule = null;
     this._offcanvasOpen = false;
+    console.log({ _provider: this._provider.value });
+    this._provider.setValue(
+      {
+        saveCapsule: true,
+        _offcanvasCapsule: {
+          id,
+          label,
+          helpText,
+          type,
+        },
+      },
+      true,
+    );
+    console.log({ _provider: this._provider.value });
+    this._offcanvasCapsule = null;
     this._saveToStorage();
   }
 
   private _onCapsuleConfigClose() {
-    const el = this.querySelector("capsule-config-offcanvas .offcanvas");
-    if (
-      el &&
-      (
-        window as unknown as {
-          bootstrap?: {
-            Offcanvas: {
-              getInstance: (el: Element) => { hide: () => void } | null;
-            };
-          };
-        }
-      ).bootstrap?.Offcanvas
-    ) {
-      (
-        window as unknown as {
-          bootstrap: {
-            Offcanvas: {
-              getInstance: (el: Element) => { hide: () => void } | null;
-            };
-          };
-        }
-      ).bootstrap.Offcanvas.getInstance(el)?.hide();
-    }
     this._offcanvasCapsule = null;
     this._offcanvasOpen = false;
   }

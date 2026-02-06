@@ -26,9 +26,6 @@ export class CapsuleConfigOffcanvas extends LitElement {
   @state() private _helpText = "";
   @state() private _type: VariableType = "text";
 
-  /** Id del offcanvas para Bootstrap */
-  private readonly offcanvasId = "capsule-config-offcanvas";
-
   updated(changed: Map<string, unknown>) {
     if (changed.has("capsule") && this.capsule) {
       this._label = this.capsule.label;
@@ -70,7 +67,7 @@ export class CapsuleConfigOffcanvas extends LitElement {
       <div
         class="offcanvas offcanvas-end"
         tabindex="-1"
-        id="${this.offcanvasId}"
+        id="capsule-config-offcanvas"
         aria-labelledby="offcanvasCapsuleLabel"
       >
         <div class="offcanvas-header">
