@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { EditorState, Plugin, TextSelection } from "prosemirror-state";
+import { EditorState, Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { proseMirrorSchema } from "../lib/prosemirror-schema.js";
 import { history, redo, undo } from "prosemirror-history";
@@ -9,6 +9,7 @@ import { baseKeymap } from "prosemirror-commands";
 import type { VariableCapsule } from "../types/variables.js";
 import { ContextConsumer, ContextProvider } from "@lit/context";
 import { lexdokaContext } from "../context/context.js";
+import { exampleSetup } from "prosemirror-example-setup";
 
 /**
  * Editor ProseMirror con dos modos:
@@ -30,9 +31,34 @@ export class ProseMirrorEditor extends LitElement {
     }
     .ProseMirror {
       outline: none;
+      min-height: 100px;
+      border: 1px solid #f0f0f0;
+      outline: none;
+    }
+    .pm-content {
+      background: white;
+    }
+    .ProseMirror-menubar {
+      background: #f0f0f0;
+      display: flex;
+      align-items: start;
+      height: 30px;
+    }
+    .ProseMirror-menubar use {
+      width: 10px;
+      heigth: 10px;
+    }
+
+    .ProseMirror-menuitem {
+      margin-right: 4px;
+      display: inline-block;
     }
     .ProseMirror p {
-      margin: 0 0 0.5em;
+      margin-bottom: 1em;
+      min-height: 1em; /* Crucial for empty paragraphs */
+    }
+    .ProseMirror-trailingBreak {
+      display: inline;
     }
     .variable-capsule {
       display: inline-flex;
@@ -122,13 +148,14 @@ export class ProseMirrorEditor extends LitElement {
   private _buildPlugins() {
     const component = this;
     return [
-      history(),
-      keymap(baseKeymap),
-      keymap({
-        "Mod-z": undo,
-        "Mod-y": redo,
-        "Mod-Shift-z": redo,
-      }),
+      // history(),
+      // keymap(baseKeymap),
+      // keymap({
+      //   "Mod-z": undo,
+      //   "Mod-y": redo,
+      //   "Mod-Shift-z": redo,
+      // }),
+      ...exampleSetup({ schema: proseMirrorSchema }),
       // Plugin para hacer clic en cápsula y abrir config (solo en edición)
       new Plugin({
         props: {
@@ -157,14 +184,15 @@ export class ProseMirrorEditor extends LitElement {
     const plugins = this._buildPlugins();
     const docSource = this._nextDoc ?? this.initialDoc;
     this._nextDoc = null;
-    if (docSource) {
-      try {
-        const doc = proseMirrorSchema.nodeFromJSON(docSource);
-        return EditorState.create({ doc, plugins });
-      } catch (_) {
-        // fallback empty doc
-      }
-    }
+    // if (docSource) {
+    //   console.log("loading former schema");
+    //   try {
+    //     const doc = proseMirrorSchema.nodeFromJSON(docSource);
+    //     return EditorState.create({ doc, plugins });
+    //   } catch (e) {
+    //     console.error("Schema Mismatch Error:", e.message);
+    //   }
+    // }
     return EditorState.create({
       doc: proseMirrorSchema.topNodeType.createAndFill(
         null,
@@ -290,7 +318,6 @@ export class ProseMirrorEditor extends LitElement {
     ) {
       this.setDocFromJSON(this.initialDoc);
     }
-    console.log({ lexDokaConsumer: this.lexDokaConsumer.value });
 
     if (this.lexDokaConsumer.value.saveCapsule) {
       let label = this.lexDokaConsumer.value._offcanvasCapsule!.label;
@@ -317,41 +344,39 @@ export class ProseMirrorEditor extends LitElement {
         ${!this.productionMode
           ? html`
               <div class="toolbar">
-                <div class="dropdown">
-                  <span> Elegir variable: </span>
-                  <ul class="dropdown-menu">
-                    ${this.availableCapsules.map(
-                      (c) => html`
-                        <li>
-                          <a
-                            class="dropdown-item"
-                            href="#"
-                            @click=${(e: Event) => {
-                              e.preventDefault();
-                              this._insertCapsule(c);
-                            }}
-                            >${c.label} (${c.type})</a
-                          >
-                        </li>
-                      `,
-                    )}
-                  </ul>
-                </div>
+                ${this.availableCapsules.length != 0
+                  ? html`<div class="mb-3">
+                      <label class="form-label">Elegir variable:</label>
+                      <select
+                        class="form-select"
+                        @change=${(e: Event) => {
+                          e.preventDefault();
+                          const target = e.target as HTMLSelectElement;
+                          const selectedValue = target.value;
+                          this._insertCapsule(selectedValue);
+                        }}
+                      >
+                        ${this.availableCapsules.map(
+                          (c) => html`
+                          <option value=${c.id}>
+                            ${c.label} (${c.type})</a
+                          </option>
+                        `,
+                        )}
+                      </select>
+                    </div>`
+                  : ""}
               </div>
             `
           : nothing}
-        ${!this.productionMode
-          ? html`<hr
-              style="margin: 0 0.5em 0.5em; border: none; border-top: 2px solid #ddd; height: 1px;"
-            />`
-          : ""}
 
         <div class="pm-content"></div>
       </div>
     `;
   }
 
-  private _insertCapsule(capsule: VariableCapsule) {
+  private _insertCapsule(id: string) {
+    let capsule = this.availableCapsules.find((cap) => cap.id == id);
     if (!this._view || !capsule) return;
     const node = proseMirrorSchema.nodes.variableCapsule.create({
       id: capsule.id,
@@ -363,7 +388,6 @@ export class ProseMirrorEditor extends LitElement {
     const { state, dispatch } = this._view;
     const { from } = state.selection;
     const tr = state.tr.insert(from, node);
-    // tr.setSelection(TextSelection.near(tr.doc.resolve(from + node.nodeSize)));
     dispatch(tr);
   }
 }

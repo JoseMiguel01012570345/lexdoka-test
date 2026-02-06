@@ -1,8 +1,6 @@
-import { Schema } from "prosemirror-model";
-import {
-  nodes as baseNodes,
-  marks as baseMarks,
-} from "prosemirror-schema-basic";
+import { NodeSpec, Schema } from "prosemirror-model";
+import { schema } from "prosemirror-schema-basic";
+import { addListNodes } from "prosemirror-schema-list";
 
 /**
  * Nodo para cápsula de variable en ProseMirror.
@@ -46,9 +44,20 @@ const variableCapsuleNode = {
     },
   ],
 };
+const baseNodes = addListNodes(schema.spec.nodes, "paragraph block*", "block");
 
-const nodes = { ...baseNodes, variableCapsule: variableCapsuleNode };
+// 2. Use .append() to add your custom node
+const nodes = baseNodes.append({
+  variableCapsule: variableCapsuleNode as NodeSpec,
+});
 
-const schema = new Schema({ nodes, marks: baseMarks });
+const mySchema = new Schema({
+  nodes,
+  marks: schema.spec.marks,
+});
 
-export { schema as proseMirrorSchema };
+export { mySchema as proseMirrorSchema };
+
+console.log("Top node type:", mySchema.topNodeType.name);
+
+console.log("Available nodes:", Object.keys(mySchema.nodes));

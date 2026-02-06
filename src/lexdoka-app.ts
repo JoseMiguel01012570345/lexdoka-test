@@ -88,12 +88,11 @@ export class LexDokaApp extends LitElement {
   }
 
   private _saveToStorage() {
-    console.log("saving");
     const editor = this.querySelector("prosemirror-editor") as {
       getDocJSON?: () => unknown;
     } | null;
     const proseDoc = editor?.getDocJSON?.() ?? this._proseDoc;
-    console.log({ editor });
+
     // TODO: empty doc is not being saved
     if (proseDoc) this._proseDoc = proseDoc;
     saveToStorage({
@@ -136,7 +135,6 @@ export class LexDokaApp extends LitElement {
         : c,
     );
     this._offcanvasOpen = false;
-    console.log({ _provider: this._provider.value });
     this._provider.setValue(
       {
         saveCapsule: true,
@@ -149,7 +147,7 @@ export class LexDokaApp extends LitElement {
       },
       true,
     );
-    console.log({ _provider: this._provider.value });
+
     this._offcanvasCapsule = null;
     this._saveToStorage();
   }
