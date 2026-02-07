@@ -36,6 +36,7 @@ export class LexDokaApp extends LitElement {
     initialValue: {
       saveCapsule: false,
       _offcanvasCapsule: this._offcanvasCapsule,
+      view: null,
     },
   });
   // @state() private saveCapsule = false;
@@ -108,6 +109,7 @@ export class LexDokaApp extends LitElement {
     this._offcanvasOpen = false;
     this._provider.setValue(
       {
+        ...this._provider.value,
         saveCapsule: true,
         _offcanvasCapsule: {
           id,

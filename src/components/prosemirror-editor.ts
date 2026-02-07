@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { EditorState, Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
@@ -8,15 +8,9 @@ import { ContextConsumer, ContextProvider } from "@lit/context";
 import { lexdokaContext } from "../context/context.js";
 import { exampleSetup, buildMenuItems } from "prosemirror-example-setup";
 import {MenuItem} from "prosemirror-menu"
-import {DOMParser} from "prosemirror-model"
+import {DOMParser, NodeSpec} from "prosemirror-model"
 import { editorStyles } from "../styles/editor-styles.js";
 
-
-/**
- * Editor ProseMirror con dos modos:
- * - Edición: modificar texto e insertar/configurar cápsulas
- * - Producción: texto estático, solo rellenar cápsulas
- */
 @customElement("prosemirror-editor")
 export class ProseMirrorEditor extends LitElement {
   static readonly styles = editorStyles
@@ -25,11 +19,12 @@ export class ProseMirrorEditor extends LitElement {
   @property({ type: Object }) initialDoc: unknown = null;
   @property({ type: Array }) availableCapsules: VariableCapsule[] = [];
   @state() private _view: EditorView | null = null;
-  @property()
+  @state()
   private lexDokaConsumer = new ContextConsumer(this, {
     context: lexdokaContext,
     subscribe: true,
   });
+  @state()
   private lexDokaProvider = new ContextProvider(this, {
     context: lexdokaContext,
   });
@@ -99,8 +94,21 @@ export class ProseMirrorEditor extends LitElement {
     const docSource = this._nextDoc ?? this.initialDoc;
     
     this._nextDoc = null;
+    
+    let menu = buildMenuItems(proseMirrorSchema)
+    
+    this.availableCapsules.forEach(cap =>{
+    let insertCapsule = this._insertCapsule.bind(this)
+
+    return menu.insertMenu.content.push(new MenuItem({
+      title: "Insert " + cap.label + `(${cap.type})`,
+      label: cap.label,
+      enable: (state) => insertCapsule(cap.id)(state),
+      run: (state, dispatch) => insertCapsule(cap.id)(state, dispatch)
+    }))})
+    const plugins = this._buildPlugins(menu);
+
     if (docSource) {
-        console.log("loading former schema");
         try {
             const doc = proseMirrorSchema.nodeFromJSON(docSource);
             return EditorState.create({ doc, plugins });
@@ -108,25 +116,12 @@ export class ProseMirrorEditor extends LitElement {
           console.error("Schema Mismatch Error:", e.message);
         }
       }
-      
-      let menu = buildMenuItems(proseMirrorSchema)
-      
-      this.availableCapsules.forEach(cap =>{
-      let insertCapsule = this._insertCapsule.bind(this)
 
-      return menu.insertMenu.content.push(new MenuItem({
-        title: "Insert " + cap.label + `(${cap.type})`,
-        label: cap.label,
-        enable: (state) => insertCapsule(cap.id, "enable")(state),
-        run: (state, dispatch) => insertCapsule(cap.id, "run")(state, dispatch)
-      }))})
-      const plugins = this._buildPlugins(menu);
-      let content = this.renderRoot.querySelector("#content") as HTMLElement | null
-      if (!content) {
-        console.warn('#content not found in renderRoot; using empty fallback')
-        content = document.createElement('div')
-      }
-      let startDoc = DOMParser.fromSchema(proseMirrorSchema).parse(content)
+    let content = this.renderRoot.querySelector("#content") as HTMLElement | null
+    if (!content) {
+      content = document.createElement('div')
+    }
+    let startDoc = DOMParser.fromSchema(proseMirrorSchema).parse(content)
 
 
     return EditorState.create({
@@ -137,6 +132,13 @@ export class ProseMirrorEditor extends LitElement {
 
   firstUpdated() {
     this._mountView();
+    this.lexDokaProvider.setValue(
+      {
+        _offcanvasCapsule: this.lexDokaConsumer.value._offcanvasCapsule,
+        saveCapsule: this.lexDokaConsumer.value.saveCapsule,
+         view: this._view
+      }
+    )
   }
 
   private _mountView() {
@@ -145,7 +147,8 @@ export class ProseMirrorEditor extends LitElement {
     ) as HTMLDivElement;
     if (!content) return;
     content.innerHTML = "";
-    const state = this._createState();
+    let state = null
+    state = this._createState();
     this._view = new EditorView(content, {
       state,
       editable: () => !this.productionMode,
@@ -167,8 +170,10 @@ export class ProseMirrorEditor extends LitElement {
         span.setAttribute("data-capsule-id", node.attrs.id);
         span.title = node.attrs.helpText || node.attrs.label;
         const type = node.attrs.type;
+        let tag = null
         if (type === "richText") {
           const textarea = document.createElement("textarea");
+          tag = textarea
           textarea.placeholder = node.attrs.label;
           textarea.value = node.attrs.value || "";
           textarea.rows = 3;
@@ -179,12 +184,12 @@ export class ProseMirrorEditor extends LitElement {
               ...node.attrs,
               value: textarea.value,
             });
-            // TODO: When the transition occurs, the component unselects
-            // view.dispatch(tr);
+            view.dispatch(tr);
           });
           span.appendChild(textarea);
         } else {
           const input = document.createElement("input");
+          tag = input
           input.type = type === "date" ? "date" : "text";
           input.placeholder = node.attrs.label;
           input.value = node.attrs.value || "";
@@ -197,45 +202,76 @@ export class ProseMirrorEditor extends LitElement {
             });
             view.dispatch(tr);
           });
-          // TODO: When the transition occurs, the component unselects
           span.appendChild(input);
         }
-        return { dom: span };
+        return {
+           dom: span,
+          update: (newNode: NodeSpec) => {
+            if (newNode.type !== node.type) return false;
+            // Update local reference to node so getPos() stays current
+            node = newNode; 
+            
+            // Update the input value only if it's different from the current one
+            // (This prevents the cursor from jumping to the end)
+            if (tag && tag.value !== newNode.attrs.value) {
+              tag.value = newNode.attrs.value || "";
+            }
+            return true; // Tells ProseMirror NOT to re-draw the whole node
+          },
+          // Ensure ProseMirror ignores typing inside the input
+          ignoreMutation: () => true
+
+         };
       },
     };
     return ret;
   }
 
-  editCapsule(label: string, helpText: string, type: string) {
-    const nodes = this._view!.state.doc.content.content[0].content.content;
-    let index = 0;
-    nodes.forEach((node) => {
-      if (
-        node &&
-        node.type.name === "variableCapsule" &&
-        node.attrs.type === type
-      ) {
-        const updatedNode = node.type.create(
-          {
-            ...node.attrs,
-            label,
-            helpText,
-            type,
-          },
-          node.content,
-          node.marks,
-        );
-        const { state, dispatch } = this._view!;
-        const tr = state.tr.replaceWith(index + 1, index + 2, updatedNode);
-        dispatch(tr);
-      }
-      if (node.type.name !== "variableCapsule") {
-        index += node.text!.length;
-      } else index += 1;
+  editCapsule(id: string, label: string, helpText: string, type: string) {
+  if (!this._view) return;
+
+  const { state, dispatch } = this._view;
+  const tr = state.tr;
+  let found = false;
+
+  // Iterate through all nodes in the document
+  state.doc.descendants((node, pos) => {
+    console.log({node, pos})
+    if (node.type.name === "variableCapsule" && node.attrs.id === id) {
+      // Update only the attributes, keeping the node structure intact
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        label,
+        helpText,
+        type
+      });
+      found = true;
+    }
+  });
+
+  if (found) {
+    dispatch(tr);
+  }
+}
+
+  updateSchema(){
+    const menu = buildMenuItems(proseMirrorSchema);
+    this.availableCapsules.forEach(cap => {
+      menu.insertMenu.content.push(new MenuItem({
+        title: "Insert " + cap.label,
+        label: cap.label,
+        enable: (state) => this._insertCapsule(cap.id, "enable")(state),
+        run: (state, dispatch) => this._insertCapsule(cap.id, "run")(state, dispatch)
+      }));
     });
+
+    const newPlugins = this._buildPlugins(menu);
+    const newState = this._view!.state.reconfigure({ plugins: newPlugins });
+    this._view!.updateState(newState);
   }
 
   updated(changed: Map<string, unknown>) {
+    console.log({changed})
     if (changed.has("productionMode") && this._view) {
       this._nextDoc = this._view.state.doc.toJSON();
       this._view.destroy();
@@ -250,14 +286,16 @@ export class ProseMirrorEditor extends LitElement {
     ) {
       this.setDocFromJSON(this.initialDoc);
     }
-
     if (this.lexDokaConsumer.value.saveCapsule) {
+      let id = this.lexDokaConsumer.value._offcanvasCapsule!.id;
       let label = this.lexDokaConsumer.value._offcanvasCapsule!.label;
       let helpText = this.lexDokaConsumer.value._offcanvasCapsule!.helpText;
       let type = this.lexDokaConsumer.value._offcanvasCapsule!.type;
-      this.editCapsule(label, helpText, type);
+      this.editCapsule(id, label, helpText, type);
       this.dispatchEvent(new CustomEvent("modified-capsule"));
+      this.updateSchema();
       this.lexDokaProvider.setValue({
+        view: this.lexDokaConsumer.value.view,
         saveCapsule: false,
         _offcanvasCapsule: null,
       });
@@ -281,10 +319,10 @@ export class ProseMirrorEditor extends LitElement {
 
 
   
-  private _insertCapsule(id: string, funName) {
+  private _insertCapsule(id: string) {
     return (state, dispatch) => {
     let capsule = this.availableCapsules.find((cap) => cap.id == id);
-    if (!this._view || !capsule) return false;
+    if (!this._view || !capsule || this.productionMode) return false;
     const node = proseMirrorSchema.nodes.variableCapsule.create({
       id: capsule.id,
       type: capsule.type,
@@ -292,7 +330,7 @@ export class ProseMirrorEditor extends LitElement {
       helpText: capsule.helpText,
       value: capsule.value,
     });
-    
+
     if(dispatch){
       const { from } = state.selection;
       const tr = state.tr.insert(from, node);
