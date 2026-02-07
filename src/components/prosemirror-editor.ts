@@ -317,6 +317,15 @@ export class ProseMirrorEditor extends LitElement {
     `;
   }
 
+  insertHTML(htmlString: string) {
+    const { state, dispatch } = this._view as EditorView;
+    console.log("Inserting HTML:", htmlString);
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = htmlString;
+    const slice = DOMParser.fromSchema(state.schema).parseSlice(tempDiv);
+    const tr = state.tr.replaceSelection(slice);
+    dispatch(tr);
+  }
 
   
   private _insertCapsule(id: string) {
@@ -330,8 +339,11 @@ export class ProseMirrorEditor extends LitElement {
       helpText: capsule.helpText,
       value: capsule.value,
     });
-
     if(dispatch){
+      if(capsule.type === "richText"){
+        this.insertHTML(capsule.value);
+        return true
+      }
       const { from } = state.selection;
       const tr = state.tr.insert(from, node);
       dispatch(tr);
