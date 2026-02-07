@@ -111,8 +111,15 @@ export class CanvasForm extends LitElement {
     this.dispatchCapsuleValueChange(id, value);
   }
 
+  // protected createRenderRoot() {
+  //   return this;
+  // }
+
   render() {
     return html`
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
       <div class="canvas-container" style="position: relative;">
         ${!this.productionMode
           ? html`
@@ -173,24 +180,10 @@ export class CanvasForm extends LitElement {
         >
         <span
           class="delete"
-          style="position: absolute; top: -10px; right: -10px; z-index: 3; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.10); border: 1px solid #dee2e6; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer;"
           @click=${(e: Event) => this._deleteCapsule(cap.id, e)}
           aria-label="Eliminar"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            class="bi bi-x-lg"
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              d="M2.146 2.146a.5.5 0 0 1 .708 0L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854a.5.5 0 0 1 0-.708z"
-            />
-          </svg>
+          <i class="bi bi-x-circle"></i>
         </span>
       </div>
     `;
@@ -206,7 +199,9 @@ export class CanvasForm extends LitElement {
       >
         ${isRich
           ? html`
+            <div class="input-group">
               <textarea
+                class="form-control"
                 .value=${cap.value}
                 placeholder="${cap.label}"
                 @input=${(e: Event) =>
@@ -215,6 +210,8 @@ export class CanvasForm extends LitElement {
                     (e.target as HTMLTextAreaElement).value,
                   )}
               ></textarea>
+            </div>
+
             `
           : html`
               <input

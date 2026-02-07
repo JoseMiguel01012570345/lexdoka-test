@@ -65,5 +65,6 @@ export const canvasStyles = css`
       gap: 0.25rem;
       margin-bottom: 0.5rem;
       flex-wrap: wrap;
+      padding: 0.25rem;
     }
   `;
