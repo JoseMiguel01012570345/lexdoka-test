@@ -60,8 +60,8 @@ export function createCanvasCapsule(
   const base = createCapsule(overrides);
   return {
     ...base,
-    x: overrides.x ?? 20,
-    y: overrides.y ?? 20,
+    x: overrides.x ?? Math.random() * 150,
+    y: overrides.y ?? Math.random() * 150,
     width: overrides.width ?? 200,
     height: overrides.height ?? 32,
   };
