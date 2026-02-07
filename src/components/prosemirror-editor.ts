@@ -1,15 +1,16 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { EditorState, Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { proseMirrorSchema } from "../lib/prosemirror-schema.js";
-import { history, redo, undo } from "prosemirror-history";
-import { keymap } from "prosemirror-keymap";
-import { baseKeymap } from "prosemirror-commands";
 import type { VariableCapsule } from "../types/variables.js";
 import { ContextConsumer, ContextProvider } from "@lit/context";
 import { lexdokaContext } from "../context/context.js";
-import { exampleSetup } from "prosemirror-example-setup";
+import { exampleSetup, buildMenuItems } from "prosemirror-example-setup";
+import {MenuItem} from "prosemirror-menu"
+import {DOMParser} from "prosemirror-model"
+import { editorStyles } from "../styles/editor-styles.js";
+
 
 /**
  * Editor ProseMirror con dos modos:
@@ -18,91 +19,7 @@ import { exampleSetup } from "prosemirror-example-setup";
  */
 @customElement("prosemirror-editor")
 export class ProseMirrorEditor extends LitElement {
-  static styles = css`
-    .editor-wrap {
-      border: 1px solid var(--bs-border-color);
-      border-radius: 0.375rem;
-      padding: 0.75rem;
-      min-height: 120px;
-      background: #fff;
-    }
-    .editor-wrap.readonly .ProseMirror {
-      cursor: text;
-    }
-    .ProseMirror {
-      outline: none;
-      min-height: 100px;
-      border: 1px solid #f0f0f0;
-      outline: none;
-    }
-    .pm-content {
-      background: white;
-    }
-    .ProseMirror-menubar {
-      background: #f0f0f0;
-      display: flex;
-      align-items: start;
-      height: 30px;
-    }
-    .ProseMirror-menubar use {
-      width: 10px;
-      heigth: 10px;
-    }
-
-    .ProseMirror-menuitem {
-      margin-right: 4px;
-      display: inline-block;
-    }
-    .ProseMirror p {
-      margin-bottom: 1em;
-      min-height: 1em; /* Crucial for empty paragraphs */
-    }
-    .ProseMirror-trailingBreak {
-      display: inline;
-    }
-    .variable-capsule {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.15em 0.5em;
-      margin: 0 2px;
-      border-radius: 4px;
-      background: #e7f1ff;
-      border: 1px solid #0d6efd;
-      color: #0d6efd;
-      font-size: 0.9em;
-      cursor: pointer;
-    }
-    .variable-capsule[data-type="date"] {
-      background: #fff3cd;
-      border-color: #ffc107;
-      color: #856404;
-    }
-    .variable-capsule[data-type="richText"] {
-      display: block;
-      width: 100%;
-      margin: 0.5em 0;
-      min-height: 2em;
-    }
-    .variable-capsule.production-input {
-      background: #f8f9fa;
-      border-style: dashed;
-      cursor: text;
-    }
-    .variable-capsule.production-input input,
-    .variable-capsule.production-input textarea {
-      border: none;
-      background: transparent;
-      width: 100%;
-      font: inherit;
-      padding: 0;
-    }
-    .toolbar {
-      display: flex;
-      gap: 0.25rem;
-      margin-bottom: 0.5rem;
-      flex-wrap: wrap;
-    }
-  `;
+  static readonly styles = editorStyles
 
   @property({ type: Boolean }) productionMode = false;
   @property({ type: Object }) initialDoc: unknown = null;
@@ -116,6 +33,7 @@ export class ProseMirrorEditor extends LitElement {
   private lexDokaProvider = new ContextProvider(this, {
     context: lexdokaContext,
   });
+  @property() capsule = proseMirrorSchema.nodes.variableCapsule
 
   /** Doc a usar en la próxima creación del editor (tras cambio de modo) */
   private _nextDoc: unknown = null;
@@ -145,17 +63,14 @@ export class ProseMirrorEditor extends LitElement {
     }
   }
 
-  private _buildPlugins() {
+  private _buildPlugins(menu) {
     const component = this;
     return [
-      // history(),
-      // keymap(baseKeymap),
-      // keymap({
-      //   "Mod-z": undo,
-      //   "Mod-y": redo,
-      //   "Mod-Shift-z": redo,
-      // }),
-      ...exampleSetup({ schema: proseMirrorSchema }),
+      ...exampleSetup({
+         schema: proseMirrorSchema,
+          menuContent: menu.fullMenu
+        }
+      ),
       // Plugin para hacer clic en cápsula y abrir config (solo en edición)
       new Plugin({
         props: {
@@ -181,24 +96,41 @@ export class ProseMirrorEditor extends LitElement {
   }
 
   private _createState(): EditorState {
-    const plugins = this._buildPlugins();
     const docSource = this._nextDoc ?? this.initialDoc;
+    
     this._nextDoc = null;
-    // if (docSource) {
-    //   console.log("loading former schema");
-    //   try {
-    //     const doc = proseMirrorSchema.nodeFromJSON(docSource);
-    //     return EditorState.create({ doc, plugins });
-    //   } catch (e) {
-    //     console.error("Schema Mismatch Error:", e.message);
-    //   }
-    // }
+    if (docSource) {
+        console.log("loading former schema");
+        try {
+            const doc = proseMirrorSchema.nodeFromJSON(docSource);
+            return EditorState.create({ doc, plugins });
+      } catch (e) {
+          console.error("Schema Mismatch Error:", e.message);
+        }
+      }
+      
+      let menu = buildMenuItems(proseMirrorSchema)
+      
+      this.availableCapsules.forEach(cap =>{
+      let insertCapsule = this._insertCapsule.bind(this)
+
+      return menu.insertMenu.content.push(new MenuItem({
+        title: "Insert " + cap.label + `(${cap.type})`,
+        label: cap.label,
+        enable: (state) => insertCapsule(cap.id, "enable")(state),
+        run: (state, dispatch) => insertCapsule(cap.id, "run")(state, dispatch)
+      }))})
+      const plugins = this._buildPlugins(menu);
+      let content = this.renderRoot.querySelector("#content") as HTMLElement | null
+      if (!content) {
+        console.warn('#content not found in renderRoot; using empty fallback')
+        content = document.createElement('div')
+      }
+      let startDoc = DOMParser.fromSchema(proseMirrorSchema).parse(content)
+
+
     return EditorState.create({
-      doc: proseMirrorSchema.topNodeType.createAndFill(
-        null,
-        undefined,
-        undefined,
-      )!,
+      doc:startDoc,
       plugins,
     });
   }
@@ -209,7 +141,7 @@ export class ProseMirrorEditor extends LitElement {
 
   private _mountView() {
     const content = this.renderRoot.querySelector(
-      ".pm-content",
+      "#editor",
     ) as HTMLDivElement;
     if (!content) return;
     content.innerHTML = "";
@@ -341,43 +273,18 @@ export class ProseMirrorEditor extends LitElement {
   render() {
     return html`
       <div class="editor-wrap ${this.productionMode ? "readonly" : ""}">
-        ${!this.productionMode
-          ? html`
-              <div class="toolbar">
-                ${this.availableCapsules.length != 0
-                  ? html`<div class="mb-3">
-                      <label class="form-label">Elegir variable:</label>
-                      <select
-                        class="form-select"
-                        @change=${(e: Event) => {
-                          e.preventDefault();
-                          const target = e.target as HTMLSelectElement;
-                          const selectedValue = target.value;
-                          this._insertCapsule(selectedValue);
-                        }}
-                      >
-                        ${this.availableCapsules.map(
-                          (c) => html`
-                          <option value=${c.id}>
-                            ${c.label} (${c.type})</a
-                          </option>
-                        `,
-                        )}
-                      </select>
-                    </div>`
-                  : ""}
-              </div>
-            `
-          : nothing}
-
-        <div class="pm-content"></div>
+        <div id="editor">
+        </div>
       </div>
     `;
   }
 
-  private _insertCapsule(id: string) {
+
+  
+  private _insertCapsule(id: string, funName) {
+    return (state, dispatch) => {
     let capsule = this.availableCapsules.find((cap) => cap.id == id);
-    if (!this._view || !capsule) return;
+    if (!this._view || !capsule) return false;
     const node = proseMirrorSchema.nodes.variableCapsule.create({
       id: capsule.id,
       type: capsule.type,
@@ -385,9 +292,13 @@ export class ProseMirrorEditor extends LitElement {
       helpText: capsule.helpText,
       value: capsule.value,
     });
-    const { state, dispatch } = this._view;
-    const { from } = state.selection;
-    const tr = state.tr.insert(from, node);
-    dispatch(tr);
+    
+    if(dispatch){
+      const { from } = state.selection;
+      const tr = state.tr.insert(from, node);
+      dispatch(tr);
+    }
+
+    return true}
   }
 }

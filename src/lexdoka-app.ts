@@ -7,6 +7,7 @@ import type { VariableCapsule, CanvasCapsule } from "./types/variables.js";
 import { loadFromStorage, saveToStorage } from "./lib/storage.js";
 import { ContextProvider } from "@lit/context";
 import { lexdokaContext } from "./context/context.js";
+import { mainStyles } from "./styles/main-styles.js";
 
 /**
  * Aplicación principal LexDoka.
@@ -22,37 +23,7 @@ export class LexDokaApp extends LitElement {
     return this;
   }
 
-  static styles = css`
-    :host {
-      display: block;
-      min-height: 100vh;
-      background: #f5f5f5;
-    }
-    .app-header {
-      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-      color: white;
-      padding: 1rem 0;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    .mode-toggle {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .nav-tabs .nav-link {
-      font-weight: 500;
-    }
-    .tab-pane {
-      padding: 1rem 0;
-    }
-    .section-card {
-      margin-bottom: 1.5rem;
-    }
-    .section-card h6 {
-      margin-bottom: 0.5rem;
-      color: #495057;
-    }
-  `;
+  static readonly styles = mainStyles
 
   @state() private _productionMode = false;
   @state() private _activeTab: "document" | "form" = "document";

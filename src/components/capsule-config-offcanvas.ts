@@ -16,7 +16,7 @@ export class CapsuleConfigOffcanvas extends LitElement {
 
   static styles = css`
     :host {
-      display: contents; /* No crea caja; el offcanvas se muestra con Bootstrap */
+      display: contents;
     }
   `;
 
