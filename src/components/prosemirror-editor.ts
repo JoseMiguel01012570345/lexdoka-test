@@ -54,7 +54,7 @@ export class ProseMirrorEditor extends LitElement {
       });
       this._view.updateState(state);
     } catch (e) {
-      console.error("Schema Mismatch Error:", e.message);
+      console.error("Schema Mismatch Error on setting doc from JSON:", e.message);
     }
   }
 
@@ -113,13 +113,21 @@ export class ProseMirrorEditor extends LitElement {
     
     this._nextDoc = null;
     const plugins = this._buildPlugins();
-
-    if (docSource) {
+    console.log({docSource})
+    if (docSource instanceof EditorView) {
         try {
-            const doc = proseMirrorSchema.nodeFromJSON(docSource);
+            const doc = proseMirrorSchema.nodeFromJSON(docSource.state.doc.toJSON());
             return EditorState.create({ doc, plugins });
       } catch (e) {
-          console.error("Schema Mismatch Error:", e.message);
+          console.error("Schema Mismatch Error on create state:", e.message);
+        }
+      }
+    if (docSource) {
+      try {
+          const doc = proseMirrorSchema.nodeFromJSON(docSource);
+          return EditorState.create({ doc, plugins });
+      } catch (e) {
+          console.error("Schema Mismatch Error on create state:", e.message);
         }
       }
 
