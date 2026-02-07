@@ -191,7 +191,7 @@ export class LexDokaApp extends LitElement {
 
       <main class="container py-4">
         <ul class="nav nav-tabs">
-          <li class="nav-item">
+          <li>
             <button
               class="nav-link ${this._activeTab === "document" ? "active" : ""}"
               type="button"
@@ -202,7 +202,7 @@ export class LexDokaApp extends LitElement {
               <i class="bi bi-file-text me-1"></i> Documento
             </button>
           </li>
-          <li class="nav-item">
+          <li>
             <button
               class="nav-link ${this._activeTab === "form" ? "active" : ""}"
               type="button"
@@ -218,7 +218,7 @@ export class LexDokaApp extends LitElement {
         <div>
           ${this._activeTab === "document"
             ? html`
-                <div class="section-card card">
+                <div class="main-body">
                   <div class="card-body">
                     <h6>Editor de documento (ProseMirror)</h6>
                     <p class="small text-muted">
@@ -249,7 +249,7 @@ export class LexDokaApp extends LitElement {
                 </div>
               `
             : html`
-                <div class="section-card card">
+                <div class="main-body">
                   <div class="card-body">
                     <h6>Formulario interactivo (Canvas)</h6>
                     <p class="small text-muted">
