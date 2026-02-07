@@ -53,12 +53,15 @@ export class ProseMirrorEditor extends LitElement {
         plugins: this._buildPlugins(),
       });
       this._view.updateState(state);
-    } catch (_) {
-      // ignore invalid json
+    } catch (e) {
+      console.error("Schema Mismatch Error:", e.message);
     }
   }
 
-  private _buildPlugins(menu) {
+  private _buildPlugins(menu?: any): Plugin[] {
+    if(!menu)
+      menu = this.buildMenuItems()
+
     const component = this;
     return [
       ...exampleSetup({
@@ -90,23 +93,26 @@ export class ProseMirrorEditor extends LitElement {
     ];
   }
 
-  private _createState(): EditorState {
-    const docSource = this._nextDoc ?? this.initialDoc;
-    
-    this._nextDoc = null;
-    
+  buildMenuItems() {
     let menu = buildMenuItems(proseMirrorSchema)
     
     this.availableCapsules.forEach(cap =>{
     let insertCapsule = this._insertCapsule.bind(this)
-
+  
     return menu.insertMenu.content.push(new MenuItem({
       title: "Insert " + cap.label + `(${cap.type})`,
       label: cap.label,
       enable: (state) => insertCapsule(cap.id)(state),
       run: (state, dispatch) => insertCapsule(cap.id)(state, dispatch)
     }))})
-    const plugins = this._buildPlugins(menu);
+    return menu;
+  }
+
+  private _createState(): EditorState {
+    const docSource = this._nextDoc ?? this.initialDoc;
+    
+    this._nextDoc = null;
+    const plugins = this._buildPlugins();
 
     if (docSource) {
         try {
@@ -132,13 +138,6 @@ export class ProseMirrorEditor extends LitElement {
 
   firstUpdated() {
     this._mountView();
-    this.lexDokaProvider.setValue(
-      {
-        _offcanvasCapsule: this.lexDokaConsumer.value._offcanvasCapsule,
-        saveCapsule: this.lexDokaConsumer.value.saveCapsule,
-         view: this._view
-      }
-    )
   }
 
   private _mountView() {
@@ -236,7 +235,6 @@ export class ProseMirrorEditor extends LitElement {
 
   // Iterate through all nodes in the document
   state.doc.descendants((node, pos) => {
-    console.log({node, pos})
     if (node.type.name === "variableCapsule" && node.attrs.id === id) {
       // Update only the attributes, keeping the node structure intact
       tr.setNodeMarkup(pos, undefined, {
@@ -271,7 +269,6 @@ export class ProseMirrorEditor extends LitElement {
   }
 
   updated(changed: Map<string, unknown>) {
-    console.log({changed})
     if (changed.has("productionMode") && this._view) {
       this._nextDoc = this._view.state.doc.toJSON();
       this._view.destroy();
@@ -280,8 +277,7 @@ export class ProseMirrorEditor extends LitElement {
     }
     if (
       changed.has("initialDoc") &&
-      this._view &&
-      this.initialDoc &&
+      !this.initialDoc &&
       !changed.has("productionMode")
     ) {
       this.setDocFromJSON(this.initialDoc);
@@ -319,7 +315,6 @@ export class ProseMirrorEditor extends LitElement {
 
   insertHTML(htmlString: string) {
     const { state, dispatch } = this._view as EditorView;
-    console.log("Inserting HTML:", htmlString);
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = htmlString;
     const slice = DOMParser.fromSchema(state.schema).parseSlice(tempDiv);
@@ -329,6 +324,12 @@ export class ProseMirrorEditor extends LitElement {
 
   
   private _insertCapsule(id: string) {
+    this.dispatchEvent(new CustomEvent("editor-ready", {
+      detail: { view: this._view },
+      bubbles: true,
+      composed: true,
+    }));
+
     return (state, dispatch) => {
     let capsule = this.availableCapsules.find((cap) => cap.id == id);
     if (!this._view || !capsule || this.productionMode) return false;

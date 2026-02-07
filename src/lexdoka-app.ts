@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import "./components/prosemirror-editor.js";
 import "./components/canvas-form.js";
@@ -8,6 +8,7 @@ import { loadFromStorage, saveToStorage } from "./lib/storage.js";
 import { ContextProvider } from "@lit/context";
 import { lexdokaContext } from "./context/context.js";
 import { mainStyles } from "./styles/main-styles.js";
+import { _showSaveSuccess } from "./lib/utils.js";
 
 /**
  * Aplicación principal LexDoka.
@@ -27,9 +28,9 @@ export class LexDokaApp extends LitElement {
 
   @state() private _productionMode = false;
   @state() private _activeTab: "document" | "form" = "document";
-  @state() private _proseDoc: unknown = null;
   @state() private _canvasCapsules: CanvasCapsule[] = [];
   @state() private _offcanvasCapsule: VariableCapsule | null = null;
+  @state() private _proseDoc: any = null;
   @state() private _offcanvasOpen = false;
   private _provider = new ContextProvider(this, {
     context: lexdokaContext,
@@ -60,18 +61,17 @@ export class LexDokaApp extends LitElement {
   }
 
   private _saveToStorage() {
-    const editor = this.querySelector("prosemirror-editor") as {
-      getDocJSON?: () => unknown;
-    } | null;
-    const proseDoc = editor?.getDocJSON?.() ?? this._proseDoc;
-
-    // TODO: empty doc is not being saved
+    const proseDoc = this._proseDoc?.state?.doc ?? this._proseDoc;
     if (proseDoc) this._proseDoc = proseDoc;
     saveToStorage({
       proseMirrorDoc: this._proseDoc,
       canvasCapsules: this._canvasCapsules,
     });
+    // show success popup
+    _showSaveSuccess("Guardado");
   }
+
+  
 
   private _onCapsuleSelect(
     e: CustomEvent<{ capsule: VariableCapsule | CanvasCapsule }>,
@@ -231,6 +231,11 @@ export class LexDokaApp extends LitElement {
                       .initialDoc=${this._proseDoc}
                       .availableCapsules=${this.availableCapsules}
                       @capsule-select=${this._onCapsuleSelect}
+                      @editor-ready=${(e)=>{
+                        if(e.detail && e.detail.view) {
+                          this._proseDoc = e.detail.view;
+                        }
+                      }}
                     ></prosemirror-editor>
                     ${!this._productionMode
                       ? html`
