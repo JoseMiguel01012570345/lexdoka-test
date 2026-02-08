@@ -6,6 +6,15 @@ export const editorStyles = css`
       padding: 0.75rem;
       min-height: 120px;
       background: #fff;
+      }
+    .ProseMirror pre {
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        word-break: break-all;
+    }
+
+    .ProseMirror code {
+        white-space: inherit;
     }
     .editor-wrap.readonly .ProseMirror {
       cursor: text;

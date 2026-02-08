@@ -219,7 +219,7 @@ export class LexDokaApp extends LitElement {
                     <p class="small text-muted">
                       ${this._productionMode
                         ? "Modo producción: el texto es estático; solo puedes rellenar las cápsulas de variables."
-                        : "Modo edición: escribe texto, aplica formato e inserta variables desde el botón."}
+                        : "Modo edición: escribe texto, aplica formato e inserta variables desde el botón \"Insert\"."}
                     </p>
                     <prosemirror-editor
                       .productionMode=${this._productionMode}

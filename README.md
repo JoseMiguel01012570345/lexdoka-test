@@ -2,59 +2,69 @@
 
 Aplicación que implementa **variables** en dos visualizaciones: un **documento editable (ProseMirror)** y un **formulario interactivo (Canvas)**, usando **Lit**, **ProseMirror**, **Bootstrap** y persistencia en **localStorage**.
 
-## Requisitos funcionales cubiertos
+## Resumen rápido
 
-- **Variables en Lit**: tipos Texto, Fecha y Texto enriquecido (HTML, línea completa), con **label** y **texto de ayuda** (tooltip en producción).
-- **ProseMirror**: editor con texto normal, formato e **inserción de cápsulas**. Modos **Edición** (editar texto y cápsulas) y **Producción** (solo rellenar cápsulas).
-- **Canvas**: formulario con cápsulas como campos. Modo **Edición**: CRUD y **arrastrar** para posicionar. Modo **Producción**: solo rellenar cápsulas.
-- **Offcanvas Bootstrap**: al seleccionar una cápsula en edición (documento o formulario) se abre el panel para configurar **label**, **texto de ayuda** y **tipo**.
-- **Persistencia**: configuración y contenido de ambas vistas en **localStorage**.
-- **UI**: Bootstrap para estilos; tooltips en producción con el texto de ayuda.
+- **Modo Edición**: crear/editar variables en el formulario (Canvas) y editar el documento (ProseMirror). Las cápsulas se pueden posicionar, configurar y eliminar.
+- **Modo Producción**: rellenar las cápsulas (inputs/textarea/date) sin poder mover ni borrar; el editor de texto no es editable.
+- **Fuente de verdad**: las cápsulas definidas en el Canvas son la única fuente de variables que pueden insertarse en el documento.
 
-## Cómo ejecutar
-
-### Requisitos
+## Requisitos
 
 - Node.js 18+
 - npm
 
-### Instalación y desarrollo
+## Instalación y uso
+
+Instala dependencias y levanta el servidor de desarrollo:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre en el navegador la URL que indique Vite (por ejemplo `http://localhost:5173`).
+Abre en el navegador la URL que indique Vite (por ejemplo http://localhost:5173).
 
-### Build de producción
+Build y previsualización de producción:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## Cómo probar
+Los scripts disponibles están definidos en `package.json`:
+
+- `dev`: arranca Vite en modo desarrollo
+- `build`: transpila TypeScript y genera el build de Vite
+- `preview`: sirve el build para previsualización
+
+## Cómo probar (flujo básico)
 
 1. **Modo Edición**
 
-   - **Pestaña Formulario (Canvas)**: pulsa "Texto", "Fecha" o "Texto enriquecido" para añadir cápsulas. Arrastra para mover. Clic en una cápsula → se abre el offcanvas para editar etiqueta, ayuda y tipo. Icono X para eliminar.
-   - **Pestaña Documento**: escribe en el editor. Usa "Insertar variable" o el desplegable "Elegir variable" (las variables son las definidas en el formulario). Clic en una cápsula en el texto → offcanvas para configurarla.
-   - "Guardar" persiste en localStorage.
+   - Pestaña Formulario (Canvas): pulsa "Texto", "Fecha" o "Texto enriquecido" para añadir cápsulas. Arrastra para mover. Clic en una cápsula → se abre el offcanvas para editar etiqueta, ayuda y tipo. Icono X para eliminar.
+   - Pestaña Documento: escribe en el editor. Usa "Insertar" para desplegar la lista de variables (las variables son las definidas en el formulario). Clic en una cápsula en el texto → offcanvas para configurarla.
+   - "Guardar" persiste la configuración y el contenido en `localStorage`.
 
 2. **Modo Producción**
+
    - Cambia el toggle a "Producción".
-   - En **Documento**: el texto no se edita; solo puedes rellenar las cápsulas (inputs/textarea/date). El texto de ayuda se muestra como tooltip.
-   - En **Formulario**: solo se pueden rellenar las cápsulas; no se puede mover ni borrar.
-   - Los valores se guardan al cambiar (y con "Guardar" si se muestra).
+   - Documento: el texto no es editable; sólo se pueden rellenar las cápsulas (inputs/textarea/date). El texto de ayuda se muestra como tooltip.
+   - Formulario: sólo se pueden rellenar las cápsulas; no se puede mover ni borrar.
+   - Los valores se guardan al cambiar.
 
-## Decisiones de diseño
+## Decisiones de diseño (resumen)
 
-- **Variables únicas en el formulario**: las cápsulas del **Canvas** son la fuente de verdad. En el **Documento** solo se pueden insertar variables que existan en el formulario (mismo `id`). Así se evita inconsistencia entre vistas.
+- **Variables únicas en el formulario**: las cápsulas del Canvas son la fuente de verdad. En el Documento sólo se pueden insertar variables que existan en el formulario (mismo `id`).
 - **Esquema ProseMirror**: se extiende el esquema básico con un nodo `variableCapsule` (inline, atom) con atributos `id`, `type`, `label`, `helpText`, `value`.
-- **Canvas sin &lt;canvas&gt;**: el “formulario Canvas” usa **posicionamiento absoluto** en un contenedor (no el API Canvas 2D), para simplificar CRUD y arrastre manteniendo HTML accesible.
-- **App en light DOM**: el componente raíz (`lexdoka-app`) usa `createRenderRoot()` devolviendo `this` para que el **offcanvas de Bootstrap** esté en el DOM principal y el JS de Bootstrap pueda controlarlo.
-- **Persistencia**: clave `lexdoka_app_data` en localStorage con `proseMirrorDoc` (JSON del documento) y `canvasCapsules` (array de cápsulas con posición).
+- **Canvas sin <canvas>**: el formulario Canvas usa posicionamiento absoluto en un contenedor (no la API Canvas 2D), para simplificar CRUD y arrastre manteniendo HTML accesible.
+- **App en light DOM**: el componente raíz (`lexdoka-app`) usa `createRenderRoot()` devolviendo `this` para que el offcanvas de Bootstrap esté en el DOM principal y el JS de Bootstrap pueda controlarlo.
+- **Persistencia**: clave `lexdoka_app_data` en `localStorage` con `proseMirrorDoc` (JSON del documento) y `canvasCapsules` (array de cápsulas con posición y configuración).
+
+## Archivos clave
+
+- **Entrada / App**: [src/main.ts](src/main.ts#L1) · [src/lexdoka-app.ts](src/lexdoka-app.ts#L1)
+- **Componentes**: [src/components/prosemirror-editor.ts](src/components/prosemirror-editor.ts#L1) · [src/components/canvas-form.ts](src/components/canvas-form.ts#L1) · [src/components/capsule-config-offcanvas.ts](src/components/capsule-config-offcanvas.ts#L1)
+- **Tipos y utilidades**: [src/types/variables.ts](src/types/variables.ts#L1) · [src/lib/storage.ts](src/lib/storage.ts#L1) · [src/lib/prosemirror-schema.ts](src/lib/prosemirror-schema.ts#L1)
 
 ## Estructura del proyecto
 
