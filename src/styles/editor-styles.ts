@@ -34,6 +34,15 @@ export const editorStyles = css`
       padding: 5px 0;
       margin-bottom: 23px;
     }
+    .variable-capsule.production-input{
+        width: 100%;
+        padding: 0px;
+        margin: 0px;
+      }
+    .variable-capsule.production-input textarea {
+      width: inherit !important;           /* Fills the container */ 
+      min-height: 200px;     /* Optional: matches your editor's visual height */
+    }
     .ProseMirror-selectednode {
         outline: 2px solid #8cf;
     }
@@ -108,8 +117,10 @@ export const editorStyles = css`
         
     .variable-capsule[data-type="richText"] {
       display: block;
-      width: 100%;
-      margin: 0.5em 0;
+      width: 99%;
+      margin: 0;
+      margin-bottom: 5px;
+      padding: 5px;
       min-height: 2em;
     }
     .ProseMirror-menu-submenu-wrap {

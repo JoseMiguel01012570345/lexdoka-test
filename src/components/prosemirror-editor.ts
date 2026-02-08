@@ -318,16 +318,6 @@ export class ProseMirrorEditor extends LitElement {
       </div>
     `;
   }
-
-  insertHTML(htmlString: string) {
-    const { state, dispatch } = this._view as EditorView;
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = htmlString;
-    const slice = DOMParser.fromSchema(state.schema).parseSlice(tempDiv);
-    const tr = state.tr.replaceSelection(slice);
-    dispatch(tr);
-  }
-
   
   private _insertCapsule(id: string) {
     this.dispatchEvent(new CustomEvent("editor-ready", {
@@ -346,11 +336,8 @@ export class ProseMirrorEditor extends LitElement {
       helpText: capsule.helpText,
       value: capsule.value,
     });
+
     if(dispatch){
-      if(capsule.type === "richText"){
-        this.insertHTML(capsule.value);
-        return true
-      }
       const { from } = state.selection;
       const tr = state.tr.insert(from, node);
       dispatch(tr);
