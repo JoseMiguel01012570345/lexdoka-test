@@ -113,7 +113,6 @@ export class ProseMirrorEditor extends LitElement {
     
     this._nextDoc = null;
     const plugins = this._buildPlugins();
-    console.log({docSource})
     if (docSource instanceof EditorView) {
         try {
             const doc = proseMirrorSchema.nodeFromJSON(docSource.state.doc.toJSON());
@@ -299,7 +298,6 @@ export class ProseMirrorEditor extends LitElement {
       this.dispatchEvent(new CustomEvent("modified-capsule"));
       this.updateSchema();
       this.lexDokaProvider.setValue({
-        view: this.lexDokaConsumer.value.view,
         saveCapsule: false,
         _offcanvasCapsule: null,
       });

@@ -37,7 +37,6 @@ export class LexDokaApp extends LitElement {
     initialValue: {
       saveCapsule: false,
       _offcanvasCapsule: this._offcanvasCapsule,
-      view: null,
     },
   });
   // @state() private saveCapsule = false;
@@ -61,17 +60,14 @@ export class LexDokaApp extends LitElement {
   }
 
   private _saveToStorage() {
-    const proseDoc = this._proseDoc?.state?.doc ?? this._proseDoc;
-    if (proseDoc) this._proseDoc = proseDoc;
+    const proseDoc = this._proseDoc?.state?.doc;
     saveToStorage({
-      proseMirrorDoc: this._proseDoc,
-      canvasCapsules: this._canvasCapsules,
+    proseMirrorDoc: proseDoc,
+    canvasCapsules: this._canvasCapsules,
     });
     // show success popup
     _showSaveSuccess("Guardado");
   }
-
-  
 
   private _onCapsuleSelect(
     e: CustomEvent<{ capsule: VariableCapsule | CanvasCapsule }>,
@@ -132,7 +128,6 @@ export class LexDokaApp extends LitElement {
 
   private _onCapsulesChange(e: CustomEvent<{ capsules: CanvasCapsule[] }>) {
     this._canvasCapsules = e.detail.capsules;
-    this._saveToStorage();
   }
 
   private _onCapsuleValueChange(e: CustomEvent<{ id: string; value: string }>) {

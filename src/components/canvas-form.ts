@@ -92,7 +92,8 @@ export class CanvasForm extends LitElement {
 
     const x = e.clientX - cr.left - this._dragging.dx;
     const y = e.clientY - cr.top - this._dragging.dy;
-    if (!(cr.left <= e.clientX && e.clientX <= cr.right)) return;
+    let diff = cap.width - this._dragging.dx 
+    if (!(cr.left <= e.clientX && e.clientX + diff <= cr.right)) return;
     if (!(cr.top <= e.clientY && e.clientY <= cr.bottom)) return;
     const updated = this.capsules.map((c) =>
       c.id === cap.id ? { ...c, x: Math.max(0, x), y: Math.max(0, y) } : c,
@@ -110,10 +111,6 @@ export class CanvasForm extends LitElement {
   private _onProductionInput(id: string, value: string) {
     this.dispatchCapsuleValueChange(id, value);
   }
-
-  // protected createRenderRoot() {
-  //   return this;
-  // }
 
   render() {
     return html`
