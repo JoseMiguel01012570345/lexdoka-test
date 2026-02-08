@@ -31,6 +31,8 @@ export const mainStyles = css`
     color: #495057;
   }
   .ProseMirror-prompt {
+    display: flex;
+    justify-content: center;
     background: white;
     border: 1px solid #ced4da !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -87,4 +89,9 @@ export const mainStyles = css`
     border-top: none;
     padding: 1rem;
   }
+  .modal-open {
+      overflow: hidden !important;
+      touch-action: none; 
+      -ms-touch-action: none;
+    }
   `;

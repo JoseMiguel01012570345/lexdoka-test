@@ -41,7 +41,11 @@ export class LexDokaApp extends LitElement {
   });
   // @state() private saveCapsule = false;
 
-  /** Cápsulas disponibles (para ProseMirror: las del Canvas se usan como "variables" insertables) */
+  /**
+   * Maps canvas capsules to variable definitions for ProseMirror editor.
+   * Extracts only the variable metadata (without position data).
+   * Used to populate "Insert variable" menu in editor toolbar.
+   */
   get availableCapsules(): VariableCapsule[] {
     return this._canvasCapsules.map((c) => ({
       id: c.id,
@@ -59,6 +63,11 @@ export class LexDokaApp extends LitElement {
     this._canvasCapsules = stored.canvasCapsules ?? [];
   }
 
+  /**
+   * Saves current app state to localStorage and shows success toast.
+   * Extracts ProseMirror document from editor view (if available).
+   * Persists both canvasCapsules and proseMirrorDoc in JSON format.
+   */
   private _saveToStorage() {
     const proseDoc = this._proseDoc?.state?.doc;
     saveToStorage({
@@ -69,6 +78,12 @@ export class LexDokaApp extends LitElement {
     _showSaveSuccess("Guardado");
   }
 
+  /**
+   * Handles capsule selection from editor or canvas.
+   * Opens offcanvas panel for configuration via Bootstrap Offcanvas API.
+   * Uses requestAnimationFrame to ensure offcanvas element is in DOM before initialization.
+   * @param e CustomEvent with capsule detail from prosemirror-editor or canvas-form
+   */
   private _onCapsuleSelect(
     e: CustomEvent<{ capsule: VariableCapsule | CanvasCapsule }>,
   ) {
@@ -88,6 +103,12 @@ export class LexDokaApp extends LitElement {
     });
   }
 
+  /**
+   * Persists capsule configuration changes from offcanvas to state and storage.
+   * Updates all matching capsules in _canvasCapsules array immutably.
+   * Updates shared context so ProseMirror editor can sync node attributes.
+   * Finally saves to localStorage and closes offcanvas.
+   */
   private _onCapsuleConfigSave(
     e: CustomEvent<{
       id: string;
@@ -97,12 +118,14 @@ export class LexDokaApp extends LitElement {
     }>,
   ) {
     const { id, label, helpText, type } = e.detail;
+    // Update capsule in canvas array
     this._canvasCapsules = this._canvasCapsules.map((c) =>
       c.id === id
         ? { ...c, label, helpText, type: type as CanvasCapsule["type"] }
         : c,
     );
     this._offcanvasOpen = false;
+    // Publish to context so other components (prosemirror-editor) react
     this._provider.setValue(
       {
         ...this._provider.value,
@@ -121,15 +144,28 @@ export class LexDokaApp extends LitElement {
     this._saveToStorage();
   }
 
+  /**
+   * Closes offcanvas and clears selected capsule from state.
+   * Called when user clicks "Cancel" or close button on offcanvas.
+   */
   private _onCapsuleConfigClose() {
     this._offcanvasCapsule = null;
     this._offcanvasOpen = false;
   }
 
+  /**
+   * Handles capsule list changes (add, delete, reorder) from canvas-form.
+   * Updates state immutably; storage auto-saved on value-change or explicit save.
+   */
   private _onCapsulesChange(e: CustomEvent<{ capsules: CanvasCapsule[] }>) {
     this._canvasCapsules = e.detail.capsules;
   }
 
+  /**
+   * Syncs capsule value changes from production mode inputs back to canvas capsules.
+   * Triggered by input events in prosemirror-editor (production) or canvas-form (production).
+   * Saves to storage immediately for persistence.
+   */
   private _onCapsuleValueChange(e: CustomEvent<{ id: string; value: string }>) {
     const { id, value } = e.detail;
     this._canvasCapsules = this._canvasCapsules.map((c) =>

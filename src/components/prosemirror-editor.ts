@@ -33,7 +33,11 @@ export class ProseMirrorEditor extends LitElement {
   /** Doc a usar en la próxima creación del editor (tras cambio de modo) */
   private _nextDoc: unknown = null;
 
-  /** Emite cuando se selecciona una cápsula para abrir offcanvas */
+  /**
+   * Dispatches capsule-select event to parent components.
+   * Bubbles and composes so event crosses light/shadow DOM boundary.
+   * Parent (lexdoka-app) listens and opens offcanvas config panel.
+   */
   dispatchCapsuleSelect(capsule: VariableCapsule) {
     this.dispatchEvent(
       new CustomEvent("capsule-select", {
@@ -44,6 +48,12 @@ export class ProseMirrorEditor extends LitElement {
     );
   }
 
+  /**
+   * Updates the editor view with a new document from JSON.
+   * Parses JSON using current schema and creates new EditorState.
+   * Handles schema mismatches gracefully by logging error without crashing.
+   * @param json JSON representation of ProseMirror document (from storage or parent)
+   */
   setDocFromJSON(json: unknown) {
     if (!this._view || json == null) return;
     try {
@@ -58,6 +68,11 @@ export class ProseMirrorEditor extends LitElement {
     }
   }
 
+  /**
+   * Constructs ProseMirror plugins including example setup and custom click handler.
+   * Handles capsule selection in edit mode by dispatching capsule-select event.
+   * Merges exampleSetup menu with custom insert capsule menu items.
+   */
   private _buildPlugins(menu?: any): Plugin[] {
     if(!menu)
       menu = this.buildMenuItems()
@@ -93,8 +108,57 @@ export class ProseMirrorEditor extends LitElement {
     ];
   }
 
+  /**
+   * Locks or unlocks page scrolling by adding/removing modal-open class to body.
+   * Compensates scrollbar width to prevent layout shift when modal appears.
+   * @param isLocked If true, locks scroll; if false, unlocks scroll
+   */
+  toggleBodyScroll(isLocked: boolean) {
+    if (isLocked) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      document.body.classList.add('modal-open');
+      console.log({body: document.body})
+    } else {
+      document.body.style.paddingRight = '0px';
+      document.body.classList.remove('modal-open');
+    }
+  }
+
+  /**
+   * Wraps a ProseMirror command to toggle body scroll lock when image dialog opens/closes.
+   * Prevents scrolling while user is composing an image URL.
+   * @param originalCommand The original command function to wrap
+   * @returns Wrapped command that manages body scroll state
+   */
+  wrapImageCommand(originalCommand) {
+    return (state, dispatch, view) => {
+      const result = originalCommand(state, dispatch, view);
+      if(document.querySelector('.ProseMirror-prompt')){
+        this.toggleBodyScroll(true);
+      }
+      else{
+        this.toggleBodyScroll(false);
+      }
+      return result;
+    };
+  }
+
+  /**
+   * Builds custom menu items with all available capsules as insert options.
+   * Wraps image command to handle body scroll locking when image dialog opens.
+   * Dynamically creates a MenuItem for each capsule (text, date, richtext).
+   * @returns Menu object with insertMenu.content containing all custom capsule items
+   */
   buildMenuItems() {
     let menu = buildMenuItems(proseMirrorSchema)
+
+    const imageItem = menu.insertMenu.content.find(item => item.spec.title === "Insert image");
+
+    if (imageItem) {
+      const originalRun = imageItem.spec.run;
+      imageItem.spec.run = this.wrapImageCommand(originalRun);
+    }
     
     this.availableCapsules.forEach(cap =>{
     let insertCapsule = this._insertCapsule.bind(this)
@@ -108,11 +172,18 @@ export class ProseMirrorEditor extends LitElement {
     return menu;
   }
 
+  /**
+   * Creates editor state from various document sources with fallback chain.
+   * Priority: _nextDoc (from mode switch) > initialDoc (parent prop) > DOM content > empty doc
+   * Handles schema mismatches by catching errors and logging them.
+   * @returns New EditorState with configured plugins and document
+   */
   private _createState(): EditorState {
     const docSource = this._nextDoc ?? this.initialDoc;
     
     this._nextDoc = null;
     const plugins = this._buildPlugins();
+    // Try to restore from EditorView state (mode switch scenario)
     if (docSource instanceof EditorView) {
         try {
             const doc = proseMirrorSchema.nodeFromJSON(docSource.state.doc.toJSON());
@@ -121,6 +192,7 @@ export class ProseMirrorEditor extends LitElement {
           console.error("Schema Mismatch Error on create state:", e.message);
         }
       }
+    // Try to restore from JSON doc (from storage/props)
     if (docSource) {
       try {
           const doc = proseMirrorSchema.nodeFromJSON(docSource);
@@ -130,6 +202,7 @@ export class ProseMirrorEditor extends LitElement {
         }
       }
 
+    // Fallback: parse existing DOM content if available
     let content = this.renderRoot.querySelector("#content") as HTMLElement | null
     if (!content) {
       content = document.createElement('div')
@@ -147,6 +220,12 @@ export class ProseMirrorEditor extends LitElement {
     this._mountView();
   }
 
+  /**
+   * Mounts (or remounts) the ProseMirror editor view into the DOM.
+   * Clears #editor element, creates editor state, and instantiates EditorView.
+   * In production mode, uses custom node views for variableCapsule inputs.
+   * In edit mode, capsule is read-only and clickable for config.
+   */
   private _mountView() {
     const content = this.renderRoot.querySelector(
       "#editor",
@@ -164,8 +243,22 @@ export class ProseMirrorEditor extends LitElement {
     });
   }
 
+  /**
+   * Creates custom node views for production mode.
+   * Renders each variableCapsule as an editable input/textarea instead of static text.
+   * Handles three input types: text (input), date (input type=date), richText (textarea).
+   * Updates node attributes when user inputs, triggering transaction dispatch.
+   */
   private _productionNodeViews() {
     const ret = {
+      /**
+       * Node view for variableCapsule in production mode.
+       * Creates an input element (text/date/textarea) that syncs changes to the node.
+       * @param node The variableCapsule node with id, type, label, helpText, value
+       * @param view EditorView instance for dispatching transactions
+       * @param getPos Function to get current node position in document
+       * @returns Object with DOM element and update/ignoreMutation handlers
+       */
       variableCapsule(
         node: { attrs: Record<string, string> },
         view: EditorView,
@@ -212,6 +305,11 @@ export class ProseMirrorEditor extends LitElement {
         }
         return {
            dom: span,
+          /**
+           * Handles updates to the node view when the underlying node changes.
+           * Prevents cursor jumping by only updating input value if it differs.
+           * Returns true to tell ProseMirror: don't redraw, just update this handler.
+           */
           update: (newNode: NodeSpec) => {
             if (newNode.type !== node.type) return false;
             // Update local reference to node so getPos() stays current
@@ -233,6 +331,15 @@ export class ProseMirrorEditor extends LitElement {
     return ret;
   }
 
+  /**
+   * Updates attributes of a variableCapsule node throughout the document.
+   * Searches all nodes for matching capsule id and updates label, helpText, type.
+   * Used when user saves capsule configuration from offcanvas.
+   * @param id Capsule id to search for
+   * @param label New label text
+   * @param helpText New help text
+   * @param type New variable type (text/date/richText)
+   */
   editCapsule(id: string, label: string, helpText: string, type: string) {
   if (!this._view) return;
 
@@ -259,6 +366,11 @@ export class ProseMirrorEditor extends LitElement {
   }
 }
 
+  /**
+   * Rebuilds editor plugins and state when available capsules change.
+   * Regenerates menu items for all capsules and reconfigures editor state.
+   * Called after capsule configuration changes to reflect new capsule options.
+   */
   updateSchema(){
     const menu = buildMenuItems(proseMirrorSchema);
     this.availableCapsules.forEach(cap => {
@@ -275,13 +387,21 @@ export class ProseMirrorEditor extends LitElement {
     this._view!.updateState(newState);
   }
 
+  /**
+   * Handles property changes and triggers necessary lifecycle updates.
+   * - Mode toggle: preserves document JSON, destroys view, remounts in new mode
+   * - InitialDoc change: reloads document from parent prop
+   * - Capsule config save (via context): updates node attributes and rebuilds menu
+   */
   updated(changed: Map<string, unknown>) {
+    // Handle mode switch: save doc JSON, destroy, and remount view
     if (changed.has("productionMode") && this._view) {
       this._nextDoc = this._view.state.doc.toJSON();
       this._view.destroy();
       this._view = null;
       this._mountView();
     }
+    // Reload document if initialDoc prop changed
     if (
       changed.has("initialDoc") &&
       !this.initialDoc &&
@@ -289,6 +409,7 @@ export class ProseMirrorEditor extends LitElement {
     ) {
       this.setDocFromJSON(this.initialDoc);
     }
+    // React to capsule config save from context (via offcanvas)
     if (this.lexDokaConsumer.value.saveCapsule) {
       let id = this.lexDokaConsumer.value._offcanvasCapsule!.id;
       let label = this.lexDokaConsumer.value._offcanvasCapsule!.label;
@@ -319,6 +440,13 @@ export class ProseMirrorEditor extends LitElement {
     `;
   }
   
+  /**
+   * Creates a command function to insert a variableCapsule at cursor position.
+   * Emits editor-ready event so parent can track view instance.
+   * Returns (state, dispatch) => boolean to match ProseMirror command signature.
+   * @param id Capsule id to insert
+   * @returns Command function that inserts the capsule node
+   */
   private _insertCapsule(id: string) {
     this.dispatchEvent(new CustomEvent("editor-ready", {
       detail: { view: this._view },

@@ -193,6 +193,12 @@ export const editorStyles = css`
       margin-bottom: 0.5rem;
       flex-wrap: wrap;
     }
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      padding: 0px;
+      margin: 0px;
+    }
     .ProseMirror-menuseparator {
         border-right: 1px solid #ddd;
         margin-right: 3px;

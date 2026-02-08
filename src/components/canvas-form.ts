@@ -20,7 +20,10 @@ export class CanvasForm extends LitElement {
   @state() private _dragging: { id: string; dx: number; dy: number } | null =
     null;
 
-  /** Emite cuando se selecciona una cápsula para configurar */
+  /**
+   * Dispatches capsule-select event to request opening config offcanvas.
+   * Event bubbles so lexdoka-app parent can respond.
+   */
   dispatchCapsuleSelect(capsule: CanvasCapsule) {
     this.dispatchEvent(
       new CustomEvent("capsule-select", {
@@ -31,7 +34,10 @@ export class CanvasForm extends LitElement {
     );
   }
 
-  /** Emite cuando cambian las cápsulas (posición o lista) */
+  /**
+   * Dispatches capsules-change event when list or positions change.
+   * Triggers state update and storage save in parent.
+   */
   dispatchCapsulesChange(capsules: CanvasCapsule[]) {
     this.dispatchEvent(
       new CustomEvent("capsules-change", {
@@ -42,7 +48,10 @@ export class CanvasForm extends LitElement {
     );
   }
 
-  /** Emite cuando cambia el valor de una cápsula (producción) */
+  /**
+   * Dispatches capsule-value-change event when production input changes.
+   * Parent saves value to storage and syncs to other components.
+   */
   dispatchCapsuleValueChange(id: string, value: string) {
     this.dispatchEvent(
       new CustomEvent("capsule-value-change", {
@@ -53,22 +62,41 @@ export class CanvasForm extends LitElement {
     );
   }
 
-  /** Contenedor respecto al cual se posicionan las cápsulas (left/top) */
+  /**
+   * Queries the .canvas-area container for absolute positioning reference.
+   * All capsule positions are relative to this element's bounding rect.
+   * @returns HTMLElement if found, null if not yet rendered
+   */
   private _getCanvasArea(): HTMLElement | null {
     return this.renderRoot.querySelector(".canvas-area");
   }
 
+  /**
+   * Creates and adds a new capsule of specified type to the canvas.
+   * Randomly positions within bounds. Dispatches capsules-change to parent.
+   */
   private _addCapsule(type: VariableType) {
     const newCapsule = createCanvasCapsule({ type });
     const updated = [...this.capsules, newCapsule];
     this.dispatchCapsulesChange(updated);
   }
 
+  /**
+   * Removes a capsule by id from the canvas and dispatches update.
+   * Stops event propagation to prevent triggering parent click handlers.
+   */
   private _deleteCapsule(id: string, e: Event) {
     e.stopPropagation();
     this.dispatchCapsulesChange(this.capsules.filter((c) => c.id !== id));
   }
 
+  /**
+   * Handles pointer down event to initiate capsule drag.
+   * Records starting offset (dx, dy) relative to element bounds.
+   * Only activates in edit mode. Sets pointer capture for smooth dragging.
+   * @param e PointerEvent from mouse/touch
+   * @param cap Capsule being dragged
+   */
   private _onCapsulePointerDown(e: PointerEvent, cap: CanvasCapsule) {
     if (this.productionMode) return;
     e.preventDefault();
@@ -82,6 +110,12 @@ export class CanvasForm extends LitElement {
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }
 
+  /**
+   * Handles continuous pointer move during drag.
+   * Validates movement stays within canvas bounds (respects width when checking right edge).
+   * Updates capsule position immutably by creating new capsule with dx, dy offset.
+   * Only active when _dragging is set; returns early if dragging hasn't started.
+   */
   private _onPointerMove(e: PointerEvent) {
     if (!this._dragging) return;
     const cap = this.capsules.find((c) => c.id === this._dragging!.id);
@@ -90,17 +124,25 @@ export class CanvasForm extends LitElement {
     if (!area) return;
     const cr = area.getBoundingClientRect();
 
+    // Calculate new position with drag offset
     const x = e.clientX - cr.left - this._dragging.dx;
     const y = e.clientY - cr.top - this._dragging.dy;
+    
+    // Boundary check: ensure capsule doesn't escape canvas edges
     let diff = cap.width - this._dragging.dx 
     if (!(cr.left <= e.clientX && e.clientX + diff <= cr.right)) return;
     if (!(cr.top <= e.clientY && e.clientY <= cr.bottom)) return;
+    
     const updated = this.capsules.map((c) =>
       c.id === cap.id ? { ...c, x: Math.max(0, x), y: Math.max(0, y) } : c,
     );
     this.dispatchCapsulesChange(updated);
   }
 
+  /**
+   * Ends drag operation by releasing pointer capture and clearing _dragging state.
+   * Called on pointerup or pointerleave to stop position updates.
+   */
   private _onPointerUp(e: PointerEvent) {
     if (this._dragging) {
       (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
@@ -108,6 +150,10 @@ export class CanvasForm extends LitElement {
     }
   }
 
+  /**
+   * Dispatches capsule-value-change when user types in production input.
+   * Storage is saved by parent on this event.
+   */
   private _onProductionInput(id: string, value: string) {
     this.dispatchCapsuleValueChange(id, value);
   }
@@ -162,6 +208,12 @@ export class CanvasForm extends LitElement {
     `;
   }
 
+  /**
+   * Renders an edit-mode capsule with drag handle, label, and delete button.
+   * Positioned absolutely within canvas-area using left/top CSS properties.
+   * Click opens config offcanvas; drag to move; X button to delete.
+   * Accessible with role=button and tabindex for keyboard users.
+   */
   private _renderEditCapsule(cap: CanvasCapsule) {
     return html`
       <div
@@ -186,6 +238,12 @@ export class CanvasForm extends LitElement {
     `;
   }
 
+  /**
+   * Renders a production-mode capsule as editable input/textarea.
+   * For richText: textarea with 3 rows; for text/date: standard input.
+   * Shows helpText as title tooltip. Dispatches capsule-value-change on input.
+   * Positioned absolutely like edit capsule but no drag or delete.
+   */
   private _renderProductionCapsule(cap: CanvasCapsule) {
     const isRich = cap.type === "richText";
     return html`
